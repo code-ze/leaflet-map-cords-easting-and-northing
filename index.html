@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Ind. Coordinate Calculator</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🌍 Code Industries. Calculators</h1>
+            <p>Enter coordinates, calculate distances, and draw areas</p>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="input-section">
+                    <h3>Add Coordinates</h3>
+                    <div class="coordinate-input">
+                        <input type="number" id="easting" placeholder="Easting" step="0.000001">
+                        <input type="number" id="northing" placeholder="Northing" step="0.000001">
+                        <input type="text" id="pointName" placeholder="Point Name (optional)">
+                        <button id="addPoint">Add Point</button>
+                    </div>
+                </div>
+
+                <div class="groups-section">
+                    <h3>Groups</h3>
+                    <div class="group-controls">
+                        <input type="text" id="groupName" placeholder="Group Name">
+                        <button id="createGroup">Create Group</button>
+                    </div>
+                    <div id="groupsList"></div>
+                </div>
+
+                <div class="calculations-section">
+                    <h3>Calculations</h3>
+                    <div class="calculations-tabs">
+                        <button class="tab-btn active" onclick="switchTab('distances')">Distances</button>
+                        <button class="tab-btn" onclick="switchTab('areas')">Areas</button>
+                        <button class="tab-btn" onclick="switchTab('summary')">Summary</button>
+                    </div>
+                    <div id="distanceResults" class="tab-content active"></div>
+                    <div id="areaResults" class="tab-content"></div>
+                    <div id="summaryResults" class="tab-content"></div>
+                </div>
+
+                <div class="actions-section">
+                    <button id="clearAll">Clear All</button>
+                    <button id="exportData">Export Data</button>
+                    <button id="importData">Import Data</button>
+                    <input type="file" id="fileInput" accept=".json" style="display: none;">
+                </div>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-info">
+                    <div id="coordinates"></div>
+                    <div id="scale"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+
+    <footer
+        style="text-align:center; color:#444; font-size:15px; margin-top:30px; padding:16px 0; font-weight:bold; background:#f7fafc; border-top:1px solid #e2e8f0;">
+        &copy; Code Industries. Some rights reserved. <span style="font-size:13px;">CC</span>
+    </footer>
+</body>
+
+</html>
