@@ -24,6 +24,12 @@
             <div class="sidebar">
                 <div class="input-section">
                     <h3>Add Coordinates</h3>
+                    <div class="coord-system-select" style="margin-bottom:10px;">
+                        <label for="coordSystem" style="font-size:13px; font-weight:600;">PSD93 UTM Zone:</label>
+                        <select id="coordSystem" style="margin-left:8px; padding:4px 8px; border-radius:5px;">
+                            <option value="utm40">PSD93 / UTM 40N</option>
+                        </select>
+                    </div>
                     <div class="coordinate-input">
                         <input type="number" id="easting" placeholder="Easting" step="0.000001">
                         <input type="number" id="northing" placeholder="Northing" step="0.000001">
@@ -73,7 +79,8 @@
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+    <!-- Coordinate System JS -->
+    <script src="coordsys.js"></script>
     <!-- Custom JS -->
     <script src="script.js"></script>
 

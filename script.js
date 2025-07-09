@@ -53,22 +53,25 @@ function initializeMap() {
       6
     )}`;
 
-    // Ask user if they want to add a marker at this location
+    // Always use UTM 40N (zone 40)
+    const zone = 40;
+    const [psdLat, psdLon] = window.coordSys.wgs84ToPSD93(
+      coords.lat,
+      coords.lng
+    );
+    const utm = window.coordSys.psd93ToUTM(psdLat, psdLon, zone);
+    document.getElementById("easting").value = utm.easting
+      ? utm.easting.toFixed(3)
+      : "";
+    document.getElementById("northing").value = utm.northing
+      ? utm.northing.toFixed(3)
+      : "";
+    document.getElementById("pointName").value = "";
     const pointName = prompt(
       "Enter a name for this point (or leave blank for auto-naming):"
     );
     if (pointName !== null) {
-      // User didn't cancel
-      // Convert lat/lng to approximate easting/northing
-      const easting = coords.lng * 1000000; // Simplified reverse conversion
-      const northing = coords.lat * 1000000;
-
-      // Set the input values
-      document.getElementById("easting").value = easting.toFixed(3);
-      document.getElementById("northing").value = northing.toFixed(3);
       document.getElementById("pointName").value = pointName || "";
-
-      // Automatically add the point
       addPoint();
     }
   });
@@ -123,12 +126,18 @@ function createDefaultGroup() {
   // Do nothing: no default group
 }
 
+// Get selected coordinate system
+function getSelectedCoordSystem() {
+  return document.getElementById("coordSystem").value;
+}
+
 // Add a new point
 function addPoint() {
   if (!currentGroup || !groups[currentGroup]) {
     alert("Please create and select a group before adding points.");
     return;
   }
+  // Always use UTM 40N (zone 40)
   const easting = parseFloat(document.getElementById("easting").value);
   const northing = parseFloat(document.getElementById("northing").value);
   const pointName =
@@ -140,10 +149,13 @@ function addPoint() {
     return;
   }
 
-  // Convert easting/northing to lat/lng (simplified conversion)
-  // In a real application, you'd use a proper coordinate transformation library
-  const lat = northing / 1000000; // Simplified conversion
-  const lng = easting / 1000000; // Simplified conversion
+  const zone = 40;
+  const { lat: psdLat, lon: psdLon } = window.coordSys.utmToPSD93(
+    easting,
+    northing,
+    zone
+  );
+  const [lat, lng] = window.coordSys.psd93ToWGS84(psdLat, psdLon);
 
   const point = {
     id: Date.now(),
@@ -153,6 +165,7 @@ function addPoint() {
     lat: lat,
     lng: lng,
     group: currentGroup,
+    coordSystem: "utm40",
   };
 
   // Add to group
