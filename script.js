@@ -3,8 +3,8 @@ let map;
 let currentGroup = null;
 let groups = {};
 let markers = {};
-let polygons = {};
 let polylines = {};
+let distanceLabels = {};
 
 // Initialize the application
 document.addEventListener("DOMContentLoaded", function () {
@@ -215,19 +215,21 @@ function addMarkerToMap(point) {
 
 // Remove a point
 function removePoint(pointId) {
-  const point = findPointById(pointId);
+  // Convert string to number if needed
+  const numericPointId = parseInt(pointId);
+  const point = findPointById(numericPointId);
   if (!point) return;
 
   const group = groups[point.group];
 
   if (confirm(`Are you sure you want to delete the point "${point.name}"?`)) {
     // Remove from group
-    group.points = group.points.filter((p) => p.id !== pointId);
+    group.points = group.points.filter((p) => p.id !== numericPointId);
 
     // Remove marker from map
-    if (markers[pointId]) {
-      map.removeLayer(markers[pointId]);
-      delete markers[pointId];
+    if (markers[numericPointId]) {
+      map.removeLayer(markers[numericPointId]);
+      delete markers[numericPointId];
     }
 
     // Update calculations and groups
@@ -395,22 +397,20 @@ function updateGroupsList() {
     });
     content.appendChild(pointsList);
 
-    // Calculations (area/perimeter)
-    if (group.points.length >= 3) {
+    // Distance calculations
+    if (group.points.length >= 2) {
       const calcs = document.createElement("div");
       calcs.className = "group-calculations";
-      const areaDiv = document.createElement("div");
-      areaDiv.className = "calculation-summary";
-      areaDiv.innerHTML = `<strong>Area:</strong> ${calculatePolygonArea(
-        group.points.map((p) => [p.lat, p.lng])
-      ).toFixed(2)} m²`;
-      const periDiv = document.createElement("div");
-      periDiv.className = "calculation-summary";
-      periDiv.innerHTML = `<strong>Perimeter:</strong> ${calculatePerimeter(
-        group.points.map((p) => [p.lat, p.lng])
-      ).toFixed(2)} m`;
-      calcs.appendChild(areaDiv);
-      calcs.appendChild(periDiv);
+      let totalDistance = 0;
+      
+      for (let i = 0; i < group.points.length - 1; i++) {
+        totalDistance += calculateDistance(group.points[i], group.points[i + 1]);
+      }
+      
+      const distanceDiv = document.createElement("div");
+      distanceDiv.className = "calculation-summary";
+      distanceDiv.innerHTML = `<strong>Total Distance:</strong> ${totalDistance.toFixed(2)} m`;
+      calcs.appendChild(distanceDiv);
       content.appendChild(calcs);
     }
 
@@ -473,16 +473,18 @@ function deleteGroup(groupId) {
       }
     });
 
-    // Remove polygon for this group
-    if (polygons[groupId]) {
-      map.removeLayer(polygons[groupId]);
-      delete polygons[groupId];
-    }
-
-    // Remove polyline for this group
+    // Remove polylines for this group
     if (polylines[groupId]) {
       map.removeLayer(polylines[groupId]);
       delete polylines[groupId];
+    }
+
+    // Remove distance labels for this group
+    if (distanceLabels[groupId]) {
+      distanceLabels[groupId].forEach(label => {
+        map.removeLayer(label);
+      });
+      delete distanceLabels[groupId];
     }
 
     // Remove the group
@@ -500,52 +502,6 @@ function deleteGroup(groupId) {
     fitMapToMarkers();
 
     console.log(`Group "${groupName}" with ${pointCount} points deleted`);
-  }
-}
-
-// Delete all groups
-function deleteAllGroups() {
-  const groupCount = Object.keys(groups).length;
-  const totalPoints = Object.values(groups).reduce(
-    (sum, group) => sum + group.points.length,
-    0
-  );
-
-  if (
-    confirm(
-      `Are you sure you want to delete all ${groupCount} groups with ${totalPoints} total points?`
-    )
-  ) {
-    // Remove all markers
-    Object.values(markers).forEach((marker) => {
-      map.removeLayer(marker);
-    });
-    markers = {};
-
-    // Remove all polygons
-    Object.values(polygons).forEach((polygon) => {
-      map.removeLayer(polygon);
-    });
-    polygons = {};
-
-    // Remove all polylines
-    Object.values(polylines).forEach((polyline) => {
-      map.removeLayer(polyline);
-    });
-    polylines = {};
-
-    // Clear all groups
-    groups = {};
-    currentGroup = null;
-
-    // Create default group
-    createDefaultGroup();
-
-    // Clear calculations
-    updateCalculations();
-    updateGroupsList();
-
-    console.log(`All ${groupCount} groups with ${totalPoints} points deleted`);
   }
 }
 
@@ -567,9 +523,9 @@ function switchTab(tabName) {
     .getElementById(
       tabName === "distances"
         ? "distanceResults"
-        : tabName === "areas"
-        ? "areaResults"
-        : "summaryResults"
+        : tabName === "summary"
+        ? "summaryResults"
+        : "distanceResults"
     )
     .classList.add("active");
 
@@ -586,9 +542,7 @@ function updateSummaryCalculations() {
 
   let totalPoints = 0;
   let totalDistance = 0;
-  let totalArea = 0;
-  let totalPerimeter = 0;
-  let groupsWithAreas = 0;
+  let groupsWithDistances = 0;
 
   Object.keys(groups).forEach((groupId) => {
     const group = groups[groupId];
@@ -599,12 +553,8 @@ function updateSummaryCalculations() {
       totalDistance += calculateDistance(group.points[i], group.points[i + 1]);
     }
 
-    // Calculate area if 3+ points
-    if (group.points.length >= 3) {
-      const coordinates = group.points.map((point) => [point.lat, point.lng]);
-      totalArea += calculatePolygonArea(coordinates);
-      totalPerimeter += calculatePerimeter(coordinates);
-      groupsWithAreas++;
+    if (group.points.length >= 2) {
+      groupsWithDistances++;
     }
   });
 
@@ -626,16 +576,8 @@ function updateSummaryCalculations() {
         <span class="summary-stat-label">Total Distance (m)</span>
       </div>
       <div class="summary-stat">
-        <span class="summary-stat-value">${totalArea.toFixed(2)}</span>
-        <span class="summary-stat-label">Total Area (m²)</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-stat-value">${groupsWithAreas}</span>
-        <span class="summary-stat-label">Areas Calculated</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-stat-value">${totalPerimeter.toFixed(2)}</span>
-        <span class="summary-stat-label">Total Perimeter (m)</span>
+        <span class="summary-stat-value">${groupsWithDistances}</span>
+        <span class="summary-stat-label">Groups with Distances</span>
       </div>
     </div>
   `;
@@ -646,7 +588,7 @@ function updateSummaryCalculations() {
 // Update calculations
 function updateCalculations() {
   updateDistanceCalculations();
-  updateAreaCalculations();
+  updateMapDistances();
 }
 
 // Update distance calculations
@@ -703,86 +645,63 @@ function updateDistanceCalculations() {
   });
 }
 
-// Update area calculations
-function updateAreaCalculations() {
-  const areaResults = document.getElementById("areaResults");
-  areaResults.innerHTML = "";
-
-  // Clear existing polygons and polylines
-  Object.keys(polygons).forEach((key) => {
-    map.removeLayer(polygons[key]);
-  });
+// Update map distances - draw polylines and add distance labels
+function updateMapDistances() {
+  // Clear existing polylines and distance labels
   Object.keys(polylines).forEach((key) => {
     map.removeLayer(polylines[key]);
   });
-  polygons = {};
+  Object.keys(distanceLabels).forEach((key) => {
+    distanceLabels[key].forEach(label => {
+      map.removeLayer(label);
+    });
+  });
   polylines = {};
+  distanceLabels = {};
 
   Object.keys(groups).forEach((groupId) => {
     const group = groups[groupId];
-    if (group.points.length < 3) return;
+    if (group.points.length < 2) return;
 
-    // Create polygon coordinates
     const coordinates = group.points.map((point) => [point.lat, point.lng]);
-
-    // Draw polygon
-    const polygon = L.polygon(coordinates, {
+    
+    // Draw polyline
+    const polyline = L.polyline(coordinates, {
       color: group.color,
-      fillColor: group.color,
-      fillOpacity: 0.3,
-      weight: 2,
+      weight: 3,
+      opacity: 0.8,
     }).addTo(map);
 
-    // Calculate area
-    const area = calculatePolygonArea(coordinates);
+    polylines[groupId] = polyline;
 
-    // Add popup to polygon
-    polygon.bindPopup(`
-            <div style="text-align: center;">
-                <h4>${group.name}</h4>
-                <p><strong>Area:</strong> ${area.toFixed(2)} square meters</p>
-                <p><strong>Perimeter:</strong> ${calculatePerimeter(
-                  coordinates
-                ).toFixed(2)} meters</p>
-            </div>
-        `);
-
-    polygons[groupId] = polygon;
-
-    // Create area result element
-    const areaElement = document.createElement("div");
-    areaElement.className = "calculation-item area";
-    areaElement.innerHTML = `
-      <h4>${group.name}</h4>
-      <div class="calculation-details">
-        <div>
-          <span class="calculation-value">${area.toFixed(2)}</span>
-          <span class="calculation-unit">m²</span>
-        </div>
-        <div>
-          <span class="calculation-value">${calculatePerimeter(
-            coordinates
-          ).toFixed(2)}</span>
-          <span class="calculation-unit">m perimeter</span>
-        </div>
-      </div>
-    `;
-
-    areaResults.appendChild(areaElement);
-  });
-
-  // Draw polylines for groups with 2 points
-  Object.keys(groups).forEach((groupId) => {
-    const group = groups[groupId];
-    if (group.points.length === 2) {
-      const coordinates = group.points.map((point) => [point.lat, point.lng]);
-      const polyline = L.polyline(coordinates, {
-        color: group.color,
-        weight: 3,
+    // Add distance labels on the map
+    const labels = [];
+    for (let i = 0; i < group.points.length - 1; i++) {
+      const point1 = group.points[i];
+      const point2 = group.points[i + 1];
+      const distance = calculateDistance(point1, point2);
+      
+      // Calculate midpoint for label placement
+      const midLat = (point1.lat + point2.lat) / 2;
+      const midLng = (point1.lng + point2.lng) / 2;
+      
+      // Create custom icon for distance label
+      const distanceIcon = L.divIcon({
+        className: 'distance-label',
+        html: `<div style="background: white; border: 2px solid ${group.color}; color: ${group.color}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; white-space: nowrap;">${distance.toFixed(1)}m</div>`,
+        iconSize: [100, 20],
+        iconAnchor: [50, 10]
+      });
+      
+      const label = L.marker([midLat, midLng], {
+        icon: distanceIcon,
+        interactive: false
       }).addTo(map);
-
-      polylines[groupId] = polyline;
+      
+      labels.push(label);
     }
+    
+    distanceLabels[groupId] = labels;
   });
 }
 
@@ -805,44 +724,6 @@ function calculateDistance(point1, point2) {
   return R * c;
 }
 
-// Calculate polygon area using shoelace formula
-function calculatePolygonArea(coordinates) {
-  let area = 0;
-  const n = coordinates.length;
-
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    area += coordinates[i][1] * coordinates[j][0];
-    area -= coordinates[j][1] * coordinates[i][0];
-  }
-
-  area = Math.abs(area) / 2;
-
-  // Convert to square meters (approximate)
-  return area * 111320 * 111320; // Rough conversion
-}
-
-// Calculate polygon perimeter
-function calculatePerimeter(coordinates) {
-  let perimeter = 0;
-  const n = coordinates.length;
-
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    const lat1 = coordinates[i][0];
-    const lng1 = coordinates[i][1];
-    const lat2 = coordinates[j][0];
-    const lng2 = coordinates[j][1];
-
-    perimeter += calculateDistance(
-      { lat: lat1, lng: lng1 },
-      { lat: lat2, lng: lng2 }
-    );
-  }
-
-  return perimeter;
-}
-
 // Fit map to show all markers
 function fitMapToMarkers() {
   const markerLayers = Object.values(markers);
@@ -861,17 +742,19 @@ function clearAll() {
     });
     markers = {};
 
-    // Clear polygons
-    Object.values(polygons).forEach((polygon) => {
-      map.removeLayer(polygon);
-    });
-    polygons = {};
-
     // Clear polylines
     Object.values(polylines).forEach((polyline) => {
       map.removeLayer(polyline);
     });
     polylines = {};
+
+    // Clear distance labels
+    Object.keys(distanceLabels).forEach((key) => {
+      distanceLabels[key].forEach(label => {
+        map.removeLayer(label);
+      });
+    });
+    distanceLabels = {};
 
     // Clear groups
     groups = {};
@@ -882,7 +765,6 @@ function clearAll() {
 
     // Clear calculations
     document.getElementById("distanceResults").innerHTML = "";
-    document.getElementById("areaResults").innerHTML = "";
   }
 }
 
@@ -925,7 +807,7 @@ function importData() {
           // Import groups
           groups = data.groups;
 
-          // Recreate markers and polygons
+          // Recreate markers and polylines
           Object.keys(groups).forEach((groupId) => {
             const group = groups[groupId];
             group.points.forEach((point) => {
@@ -971,17 +853,19 @@ function clearAllData() {
   });
   markers = {};
 
-  // Clear polygons
-  Object.values(polygons).forEach((polygon) => {
-    map.removeLayer(polygon);
-  });
-  polygons = {};
-
   // Clear polylines
   Object.values(polylines).forEach((polyline) => {
     map.removeLayer(polyline);
   });
   polylines = {};
+
+  // Clear distance labels
+  Object.keys(distanceLabels).forEach((key) => {
+    distanceLabels[key].forEach(label => {
+      map.removeLayer(label);
+    });
+  });
+  distanceLabels = {};
 
   // Clear groups
   groups = {};
@@ -989,5 +873,4 @@ function clearAllData() {
 
   // Clear calculations
   document.getElementById("distanceResults").innerHTML = "";
-  document.getElementById("areaResults").innerHTML = "";
 }
